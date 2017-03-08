@@ -80,6 +80,8 @@ THE SOFTWARE.
 	<string name="play_or_enqueue">Enqueue if playing; Play if paused</string>
 	<string name="open">Open</string>
 	<string name="go_home">Home directory</string>
+	<string name="mark_as_audiobook">Mark as audiobook</string>
+	<string name="clear_as_audiobook">Clear as audiobook</string>
 
 	<plurals name="playing">
 		<item quantity="one">1 track playing.</item>

@@ -54,6 +54,8 @@ import android.widget.TextView;
 import android.widget.SearchView;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import junit.framework.Assert;
 
@@ -405,6 +407,30 @@ public class LibraryActivity
 			mViewPager.setCurrentItem(tab);
 	}
 
+	private void handleMarkAudiobook(Intent intent) {
+		MediaLibrary.addToNoShuffle(this, getSongIds(intent));
+	}
+
+	private void handleClearAudiobook(Intent intent) {
+		MediaLibrary.removeFromNoShuffle(this, getSongIds(intent));
+	}
+
+	private boolean isAudiobook(Intent intent) {
+		return MediaLibrary.isNoShuffle(this, getSongIds(intent));
+	}
+
+	private List<Long> getSongIds(Intent intent) {
+		QueryTask query = buildQueryFromIntent(intent, true, null);
+		List<Long> ids = new ArrayList<>();
+		Cursor cursor = query.runQuery(this);
+		if (cursor != null) {
+			while (cursor.moveToNext()) {
+				ids.add(cursor.getLong(0));
+			}
+		}
+		return ids;
+	}
+
 	/**
 	 * Open the playback activity and close any activities above it in the
 	 * stack.
@@ -583,6 +609,8 @@ public class LibraryActivity
 	private static final int CTX_MENU_MORE_FROM_ARTIST = 9;
 	private static final int CTX_MENU_OPEN_EXTERNAL = 10;
 	private static final int CTX_MENU_PLUGINS = 11;
+	private static final int CTX_MENU_MARK_AUDIOBOOK = 12;
+	private static final int CTX_MENU_CLEAR_AUDIOBOOK = 13;
 
 	/**
 	 * Creates a context menu for an adapter row.
@@ -623,6 +651,11 @@ public class LibraryActivity
 					menu.add(0, CTX_MENU_PLUGINS, 1, R.string.plugins).setIntent(rowData); // last in order
 			}
 			menu.addSubMenu(0, CTX_MENU_ADD_TO_PLAYLIST, 0, R.string.add_to_playlist).getItem().setIntent(rowData);
+			if(type == MediaUtils.TYPE_FILE) {
+				boolean isAudiobook = isAudiobook(rowData);
+				menu.add(0, isAudiobook ? CTX_MENU_CLEAR_AUDIOBOOK : CTX_MENU_MARK_AUDIOBOOK, 0,
+						isAudiobook ? R.string.clear_as_audiobook : R.string.mark_as_audiobook).setIntent(rowData);
+			}
 			menu.add(0, CTX_MENU_DELETE, 0, R.string.delete).setIntent(rowData);
 		}
 	}
@@ -726,6 +759,12 @@ public class LibraryActivity
 			long id = intent.getLongExtra("id", LibraryAdapter.INVALID_ID);
 			PlaylistDialog plDialog = PlaylistDialog.newInstance(this, intent, (id == LibraryAdapter.HEADER_ID ? (MediaAdapter)mCurrentAdapter : null));
 			plDialog.show(getFragmentManager(), "PlaylistDialog");
+			break;
+		case CTX_MENU_MARK_AUDIOBOOK:
+			handleMarkAudiobook(intent);
+			break;
+		case CTX_MENU_CLEAR_AUDIOBOOK:
+			handleClearAudiobook(intent);
 			break;
 		default:
 			return super.onContextItemSelected(item);

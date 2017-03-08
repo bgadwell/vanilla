@@ -27,6 +27,7 @@ import ch.blinkenlights.android.medialibrary.MediaMetadataExtractor;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -342,7 +343,8 @@ public class MediaUtils {
 	 * @param context The Context to use
 	 */
 	private static long[] queryAllSongs(Context context) {
-		QueryTask query = new QueryTask(MediaLibrary.TABLE_SONGS, Song.EMPTY_PROJECTION, null, null, null);
+		//TODO: fix this code using a join sql statement
+		/*QueryTask query = new QueryTask(MediaLibrary.TABLE_SONGS, Song.EMPTY_PROJECTION, null, null, null);
 		Cursor cursor = query.runQuery(context);
 		if (cursor == null || cursor.getCount() == 0) {
 			sSongCount = 0;
@@ -361,7 +363,48 @@ public class MediaUtils {
 
 		shuffle(ids);
 
-		return ids;
+		return ids;*/
+		QueryTask query = new QueryTask(MediaLibrary.TABLE_SONGS, Song.EMPTY_PROJECTION, null, null, null);
+		Cursor cursor = query.runQuery(context);
+		if (cursor == null || cursor.getCount() == 0) {
+			sSongCount = 0;
+			return null;
+		}
+
+		int count = cursor.getCount();
+		List<Long> allSongIDs = new ArrayList<>();
+		for (int i = 0; i != count; ++i) {
+			if (!cursor.moveToNext())
+				return null;
+			allSongIDs.add(cursor.getLong(0));
+		}
+		cursor.close();
+		allSongIDs.removeAll(getNoShuffleSongIDs(context));
+
+		sSongCount = allSongIDs.size();
+		long[] shuffleSongIDs = new long[allSongIDs.size()];
+		for(int i = 0; i < allSongIDs.size(); i++) {
+			shuffleSongIDs[i] = allSongIDs.get(i);
+		}
+
+		shuffle(shuffleSongIDs);
+
+		return shuffleSongIDs;
+	}
+
+	public static List<Long> getNoShuffleSongIDs(Context context) {
+		List<Long> noShuffleIDs = new ArrayList<>();
+		QueryTask query = new QueryTask(MediaLibrary.TABLE_NO_SHUFFLE, new String[]{MediaLibrary.NoShuffleColumns.SONG_ID}, null, null, null);
+		Cursor cursor = query.runQuery(context);
+		if (cursor != null && cursor.getCount() > 0) {
+			int noShuffleCount = cursor.getCount();
+			for (int i = 0; i != noShuffleCount; ++i) {
+				if (cursor.moveToNext())
+					noShuffleIDs.add(cursor.getLong(0));
+			}
+			cursor.close();
+		}
+		return noShuffleIDs;
 	}
 
 	/**

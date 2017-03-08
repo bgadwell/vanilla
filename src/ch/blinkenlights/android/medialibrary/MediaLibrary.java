@@ -26,6 +26,13 @@ import android.os.Environment;
 
 import java.util.ArrayList;
 import java.io.File;
+import java.util.List;
+
+import ch.blinkenlights.android.vanilla.MediaUtils;
+
+import ch.blinkenlights.android.vanilla.MediaUtils;
+
+import ch.blinkenlights.android.vanilla.MediaUtils;
 
 public class MediaLibrary  {
 
@@ -38,6 +45,7 @@ public class MediaLibrary  {
 	public static final String TABLE_PLAYLISTS                = "playlists";
 	public static final String TABLE_PLAYLISTS_SONGS          = "playlists_songs";
 	public static final String TABLE_PREFERENCES              = "preferences";
+	public static final String TABLE_NO_SHUFFLE               = "no_shuffle";
 	public static final String VIEW_ARTISTS                   = "_artists";
 	public static final String VIEW_ALBUMARTISTS              = "_albumartists";
 	public static final String VIEW_COMPOSERS                 = "_composers";
@@ -45,6 +53,7 @@ public class MediaLibrary  {
 	public static final String VIEW_SONGS_ALBUMS_ARTISTS      = "_songs_albums_artists";
 	public static final String VIEW_SONGS_ALBUMS_ARTISTS_HUGE = "_songs_albums_artists_huge";
 	public static final String VIEW_PLAYLIST_SONGS            = "_playlists_songs";
+	public static final String VIEW_SHUFFLE_SONGS		      = "_shuffable_songs";
 
 	public static final int ROLE_ARTIST                   = 0;
 	public static final int ROLE_COMPOSER                 = 1;
@@ -404,6 +413,64 @@ public class MediaLibrary  {
 		notifyObserver();
 	}
 
+	public static void addToNoShuffle(Context context, List<Long> ids) {
+		if(null != ids && ids.size() > 0) {
+			ids.removeAll(MediaUtils.getNoShuffleSongIDs(context));
+			if (ids.size() > 0) {
+				ArrayList<ContentValues> bulk = new ArrayList<>();
+				for (long id : ids) {
+					ContentValues v = new ContentValues();
+					v.put(MediaLibrary.PlaylistSongColumns.SONG_ID, id);
+					bulk.add(v);
+				}
+				getBackend(context).bulkInsert(MediaLibrary.TABLE_NO_SHUFFLE, null, bulk);
+				MediaUtils.onMediaChange();
+			}
+		}
+	}
+
+	public static void removeFromNoShuffle(Context context, List<Long> ids) {
+		if(null != ids && ids.size() > 0) {
+			ids.retainAll(MediaUtils.getNoShuffleSongIDs(context));
+			if (ids.size() > 0) {
+				StringBuffer sb = new StringBuffer();
+				sb.append("(");
+				for (int i = 0; i < ids.size(); i++) {
+					sb.append(String.valueOf(ids.get(i)));
+					if (i < ids.size() - 1) {
+						sb.append(",");
+					}
+				}
+				sb.append(")");
+				String whereClause = NoShuffleColumns.SONG_ID + " IN " + sb.toString();
+				getBackend(context).delete(MediaLibrary.TABLE_NO_SHUFFLE, whereClause, null);
+				MediaUtils.onMediaChange();
+			}
+		}
+	}
+
+	public static boolean isNoShuffle(Context context, List<Long> ids) {
+		boolean noShuffle = false;
+		StringBuilder sb = new StringBuilder();
+		sb.append("(");
+		for(int i=0; i < ids.size(); i++) {
+			sb.append(String.valueOf(ids.get(i)));
+			if(i < ids.size()-1) {
+				sb.append(",");
+			}
+		}
+		sb.append(")");
+		try {
+			Cursor cursor = getBackend(context).query(true, MediaLibrary.TABLE_NO_SHUFFLE, new String[] {NoShuffleColumns.SONG_ID},
+                    NoShuffleColumns.SONG_ID + " IN " + sb.toString(), null,
+                    null, null, null, null);
+			noShuffle = cursor != null && cursor.getCount() > 0;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return noShuffle;
+	}
+
 	/**
 	 * Returns the number of songs in the music library
 	 *
@@ -692,5 +759,13 @@ public class MediaLibrary  {
 		 * The value of this preference
 		 */
 		String VALUE = "value";
+	}
+
+	// No shuffle songs
+	public interface NoShuffleColumns {
+		/**
+		 * The song this entry references
+		 */
+		String SONG_ID = "song_id";
 	}
 }
