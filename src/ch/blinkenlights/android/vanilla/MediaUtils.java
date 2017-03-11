@@ -27,16 +27,11 @@ import ch.blinkenlights.android.medialibrary.MediaMetadataExtractor;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-
-import android.util.Log;
-
-import junit.framework.Assert;
 
 import android.content.ActivityNotFoundException;
 import android.content.Context;
@@ -45,9 +40,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Environment;
 import android.provider.MediaStore;
-import android.text.TextUtils;
 import android.database.MatrixCursor;
-import android.util.Log;
 import android.widget.Toast;
 
 
@@ -343,8 +336,8 @@ public class MediaUtils {
 	 * @param context The Context to use
 	 */
 	private static long[] queryAllSongs(Context context) {
-		//TODO: fix this code using a join sql statement
-		/*QueryTask query = new QueryTask(MediaLibrary.TABLE_SONGS, Song.EMPTY_PROJECTION, null, null, null);
+		QueryTask query = new QueryTask(MediaLibrary.TABLE_SONGS, Song.EMPTY_PROJECTION,
+				MediaLibrary.SongColumns._ID + " NOT IN (SELECT * FROM " + MediaLibrary.TABLE_NO_SHUFFLE + ")", null, null);
 		Cursor cursor = query.runQuery(context);
 		if (cursor == null || cursor.getCount() == 0) {
 			sSongCount = 0;
@@ -363,33 +356,7 @@ public class MediaUtils {
 
 		shuffle(ids);
 
-		return ids;*/
-		QueryTask query = new QueryTask(MediaLibrary.TABLE_SONGS, Song.EMPTY_PROJECTION, null, null, null);
-		Cursor cursor = query.runQuery(context);
-		if (cursor == null || cursor.getCount() == 0) {
-			sSongCount = 0;
-			return null;
-		}
-
-		int count = cursor.getCount();
-		List<Long> allSongIDs = new ArrayList<>();
-		for (int i = 0; i != count; ++i) {
-			if (!cursor.moveToNext())
-				return null;
-			allSongIDs.add(cursor.getLong(0));
-		}
-		cursor.close();
-		allSongIDs.removeAll(getNoShuffleSongIDs(context));
-
-		sSongCount = allSongIDs.size();
-		long[] shuffleSongIDs = new long[allSongIDs.size()];
-		for(int i = 0; i < allSongIDs.size(); i++) {
-			shuffleSongIDs[i] = allSongIDs.get(i);
-		}
-
-		shuffle(shuffleSongIDs);
-
-		return shuffleSongIDs;
+		return ids;
 	}
 
 	public static List<Long> getNoShuffleSongIDs(Context context) {
@@ -571,13 +538,17 @@ public class MediaUtils {
 		   -> terminated with a / if it is a directory
 		   -> ended with a % for the LIKE query
 		*/
-		path = addDirEndSlash(sanitizeMediaPath(path)) + "%";
+		path = getFileQueryPath(path) + "%";
 		final String query = MediaLibrary.SongColumns.PATH+" LIKE ?";
 		String[] qargs = { path };
 
 		QueryTask result = new QueryTask(MediaLibrary.VIEW_SONGS_ALBUMS_ARTISTS, projection, query, qargs, FILE_SORT);
 		result.type = TYPE_FILE;
 		return result;
+	}
+
+	public static String getFileQueryPath(String path) {
+		return addDirEndSlash(sanitizeMediaPath(path));
 	}
 
 	/**

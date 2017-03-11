@@ -35,7 +35,7 @@ public class MediaLibraryBackend extends SQLiteOpenHelper {
 	/**
 	 * The database version we are using
 	 */
-	private static final int DATABASE_VERSION = 20170307;
+	private static final int DATABASE_VERSION = 20170310;
 	/**
 	 * on-disk file to store the database
 	 */
@@ -197,6 +197,9 @@ public class MediaLibraryBackend extends SQLiteOpenHelper {
 		dbh.execSQL("DELETE FROM "+MediaLibrary.TABLE_GENRES+" WHERE "+MediaLibrary.GenreColumns._ID+" NOT IN (SELECT "+MediaLibrary.GenreSongColumns._GENRE_ID+" FROM "+MediaLibrary.TABLE_GENRES_SONGS+");");
 		dbh.execSQL("DELETE FROM "+MediaLibrary.TABLE_CONTRIBUTORS_SONGS+" WHERE "+MediaLibrary.ContributorSongColumns.SONG_ID+" NOT IN (SELECT "+MediaLibrary.SongColumns._ID+" FROM "+MediaLibrary.TABLE_SONGS+");");
 		dbh.execSQL("DELETE FROM "+MediaLibrary.TABLE_CONTRIBUTORS+" WHERE "+MediaLibrary.ContributorColumns._ID+" NOT IN (SELECT "+MediaLibrary.ContributorSongColumns._CONTRIBUTOR_ID+" FROM "+MediaLibrary.TABLE_CONTRIBUTORS_SONGS+");");
+		dbh.execSQL("DELETE FROM "+MediaLibrary.TABLE_NO_SHUFFLE+" WHERE "+MediaLibrary.NoShuffleColumns.SONG_ID+" NOT IN (SELECT "+MediaLibrary.SongColumns._ID+" FROM "+MediaLibrary.TABLE_SONGS+");");
+		dbh.execSQL("DELETE FROM "+MediaLibrary.TABLE_AUDIOBOOKS_SONGS+" WHERE "+MediaLibrary.AudiobookSongColumns.SONG_ID+" NOT IN (SELECT "+MediaLibrary.SongColumns._ID+" FROM "+MediaLibrary.TABLE_SONGS+");");
+		dbh.execSQL("DELETE FROM "+MediaLibrary.TABLE_AUDIOBOOKS+" WHERE "+MediaLibrary.AudiobookColumns._ID+" NOT IN (SELECT DISTINCT "+MediaLibrary.AudiobookSongColumns.AUDIOBOOK_ID+" FROM "+MediaLibrary.TABLE_AUDIOBOOKS_SONGS+");");
 
 		if (purgeUserData) {
 			dbh.execSQL("DELETE FROM "+MediaLibrary.TABLE_PLAYLISTS_SONGS+" WHERE "+MediaLibrary.PlaylistSongColumns.SONG_ID+" NOT IN (SELECT "+MediaLibrary.SongColumns._ID+" FROM "+MediaLibrary.TABLE_SONGS+");");

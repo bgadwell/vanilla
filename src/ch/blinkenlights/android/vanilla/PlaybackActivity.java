@@ -59,6 +59,8 @@ import android.view.WindowManager;
 import android.widget.ImageButton;
 import android.widget.Toast;
 
+import ch.blinkenlights.android.medialibrary.MediaLibrary;
+
 /**
  * Base activity for activities that contain playback controls. Handles
  * communication with the PlaybackService and response to state and song

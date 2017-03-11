@@ -72,10 +72,6 @@ public class MediaSchema {
 	                  +MediaLibrary.ContributorSongColumns.SONG_ID+") "
 	  + ");";
 
-	private static final String DATABASE_CREATE_NO_SHUFFLE_SONGS = "CREATE TABLE IF NOT EXISTS" + MediaLibrary.TABLE_NO_SHUFFLE + " ("
-	 + MediaLibrary.NoShuffleColumns.SONG_ID		+ " INTEGER PRIMARY KEY"
-	 + ");";
-
 	/**
 	 * song, role index on contributors_songs table
 	 */
@@ -139,6 +135,40 @@ public class MediaSchema {
 	 */
 	private static final String INDEX_IDX_PLAYLIST_ID_SONG = "CREATE INDEX idx_playlist_id_song ON "+MediaLibrary.TABLE_PLAYLISTS_SONGS
 	 +" ("+MediaLibrary.PlaylistSongColumns.PLAYLIST_ID+", "+MediaLibrary.PlaylistSongColumns.SONG_ID+")"
+	 +";";
+
+	/**
+	 * SQL Schema  of no shuffle songs table
+	 */
+	private static final String DATABASE_CREATE_NO_SHUFFLE_SONGS = "CREATE TABLE IF NOT EXISTS " + MediaLibrary.TABLE_NO_SHUFFLE + " ("
+	 + MediaLibrary.NoShuffleColumns.SONG_ID		+ " INTEGER PRIMARY KEY"
+	 + ");";
+
+	/**
+	 * SQL schema of audiobooks table
+	 */
+	private static final String DATABASE_CREATE_AUDIOBOOKS = "CREATE TABLE IF NOT EXISTS " + MediaLibrary.TABLE_AUDIOBOOKS + " ("
+	 + MediaLibrary.AudiobookColumns._ID 			+ " INTEGER PRIMARY KEY, "
+	 + MediaLibrary.AudiobookColumns.PATH           + " VARCHAR(4096), "
+	 + MediaLibrary.AudiobookColumns.SONG_ID        + " INTEGER , "
+	 + MediaLibrary.AudiobookColumns.LOCATION       + " INTEGER "
+	 + ");";
+
+	/**
+	 * SQL Schema of 'audiobook<->songs' table
+	 */
+	private static final String DATABASE_CREATE_AUDIOBOOKS_SONGS = "CREATE TABLE IF NOT EXISTS "+ MediaLibrary.TABLE_AUDIOBOOKS_SONGS + " ("
+	 + MediaLibrary.AudiobookSongColumns.AUDIOBOOK_ID       +" INTEGER, "
+	 + MediaLibrary.AudiobookSongColumns.SONG_ID    		+" INTEGER, "
+	 + "PRIMARY KEY("+ MediaLibrary.AudiobookSongColumns.AUDIOBOOK_ID +","
+	 + 				   MediaLibrary.AudiobookSongColumns.SONG_ID +") "
+	 + ");";
+
+	/**
+	 * Index to select a song from an audiobook quickly
+	 */
+	private static final String INDEX_IDX_AUDIOBOOK_ID_SONG = "CREATE INDEX idx_audiobook_id_song ON "+MediaLibrary.TABLE_AUDIOBOOKS_SONGS
+	 +" ("+MediaLibrary.AudiobookSongColumns.SONG_ID+")"
 	 +";";
 
 	/**
@@ -243,10 +273,6 @@ public class MediaSchema {
 	  +" LEFT JOIN "+MediaLibrary.TABLE_CONTRIBUTORS+" AS _artist ON _artist."+MediaLibrary.ContributorColumns._ID+" = "+MediaLibrary.TABLE_CONTRIBUTORS_SONGS+"."+MediaLibrary.ContributorSongColumns._CONTRIBUTOR_ID
 	  +" ;";
 
-	private static final String VIEW_CREATE_ALL_SHUFFLE_SONGS = "CREATE VIEW " + MediaLibrary.VIEW_SHUFFLE_SONGS + " AS "
-	  + "SELECT " + MediaLibrary.SongColumns._ID + " FROM " + MediaLibrary.TABLE_SONGS
-	  + " LEFT JOIN " + MediaLibrary.TABLE_NO_SHUFFLE + " ON " + MediaLibrary.TABLE_SONGS + "." + MediaLibrary.SongColumns._ID + " != " + MediaLibrary.TABLE_NO_SHUFFLE + "." + MediaLibrary.NoShuffleColumns.SONG_ID;
-
 	/**
 	 * Creates a new database schema on dbh
 	 *
@@ -273,7 +299,9 @@ public class MediaSchema {
 		dbh.execSQL(VIEW_CREATE_PLAYLIST_SONGS);
 		dbh.execSQL(DATABASE_CREATE_PREFERENCES);
 		dbh.execSQL(DATABASE_CREATE_NO_SHUFFLE_SONGS);
-		dbh.execSQL(VIEW_CREATE_ALL_SHUFFLE_SONGS);
+		dbh.execSQL(DATABASE_CREATE_AUDIOBOOKS);
+		dbh.execSQL(DATABASE_CREATE_AUDIOBOOKS_SONGS);
+		dbh.execSQL(INDEX_IDX_AUDIOBOOK_ID_SONG);
 	}
 
 	/**
@@ -314,7 +342,9 @@ public class MediaSchema {
 
 		if(oldVersion < 99999999) {
 			dbh.execSQL(DATABASE_CREATE_NO_SHUFFLE_SONGS);
-			dbh.execSQL(VIEW_CREATE_ALL_SHUFFLE_SONGS);
+			dbh.execSQL(DATABASE_CREATE_AUDIOBOOKS);
+			dbh.execSQL(DATABASE_CREATE_AUDIOBOOKS_SONGS);
+			dbh.execSQL(INDEX_IDX_AUDIOBOOK_ID_SONG);
 		}
 
 	}

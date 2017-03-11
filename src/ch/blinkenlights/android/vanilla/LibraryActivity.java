@@ -379,7 +379,17 @@ public class LibraryActivity
 			all = true; // page header was clicked -> force all mode
 
 		QueryTask query = buildQueryFromIntent(intent, false, (all ? mCurrentAdapter : null));
-		query.mode = modeForAction[mode];
+		if(intent.getIntExtra("type", MediaUtils.TYPE_INVALID) == MediaUtils.TYPE_FILE) {
+			Audiobook audiobook = MediaLibrary.getAudiobookEntry(this, intent.getStringExtra("file"));
+			if(null != audiobook) {
+				query.mode = SongTimeline.MODE_AUDIOBOOK;
+				query.modeData = audiobook;
+			} else {
+				query.mode = modeForAction[mode];
+			}
+		} else {
+			query.mode = modeForAction[mode];
+		}
 		PlaybackService.get(this).addSongs(query);
 
 		if (mDefaultAction == ACTION_LAST_USED && mLastAction != action) {
@@ -407,16 +417,44 @@ public class LibraryActivity
 			mViewPager.setCurrentItem(tab);
 	}
 
-	private void handleMarkAudiobook(Intent intent) {
-		MediaLibrary.addToNoShuffle(this, getSongIds(intent));
+	private List<Long> handleExcludeFromShuffle(Intent intent) {
+		List<Long> songIDs = getSongIds(intent);
+		MediaLibrary.addToNoShuffle(this, songIDs);
+		return songIDs;
 	}
 
-	private void handleClearAudiobook(Intent intent) {
-		MediaLibrary.removeFromNoShuffle(this, getSongIds(intent));
+	private List<Long> handleIncludeInShuffle(Intent intent) {
+		List<Long> songIDs = getSongIds(intent);
+		MediaLibrary.removeFromNoShuffle(this, songIDs);
+		return songIDs;
 	}
 
-	private boolean isAudiobook(Intent intent) {
-		return MediaLibrary.isNoShuffle(this, getSongIds(intent));
+	private void handleAudiobookContextMenuItem(ContextMenu menu, MenuItem noShuffleMenuItem, Intent intent) {
+		File file = new File(intent.getStringExtra("file"));
+		Audiobook audiobook = MediaLibrary.getAudiobookEntry(this, file.getAbsolutePath());
+		boolean audiobookPath = false;
+		if(null == audiobook) {
+			audiobookPath = MediaLibrary.isPathInAudiobook(this, file.getAbsolutePath());
+		}
+		if(null != audiobook) {
+			menu.add(0, CTX_MENU_UNMARK_AUDIOBOOK, 0, R.string.unmark_as_audiobook).setIntent(intent);
+		} else if(!audiobookPath && file.isDirectory()) {
+			menu.add(0, CTX_MENU_MARK_AUDIOBOOK, 0, R.string.mark_as_audiobook).setIntent(intent);
+		}
+		if(audiobookPath || null != audiobook) {
+			noShuffleMenuItem.setEnabled(false);
+		}
+
+	}
+
+	private void handleMarkAsAudiobook(Intent intent) {
+		List<Long> songIDs = handleExcludeFromShuffle(intent);
+		MediaLibrary.addAudiobook(this, songIDs, intent.getStringExtra("file"));
+	}
+
+	private void handleUnmarkAsAudiobook(Intent intent) {
+		List<Long> songIDs = handleIncludeInShuffle(intent);
+		MediaLibrary.removeAudiobook(this, songIDs);
 	}
 
 	private List<Long> getSongIds(Intent intent) {
@@ -609,8 +647,10 @@ public class LibraryActivity
 	private static final int CTX_MENU_MORE_FROM_ARTIST = 9;
 	private static final int CTX_MENU_OPEN_EXTERNAL = 10;
 	private static final int CTX_MENU_PLUGINS = 11;
-	private static final int CTX_MENU_MARK_AUDIOBOOK = 12;
-	private static final int CTX_MENU_CLEAR_AUDIOBOOK = 13;
+	private static final int CTX_MENU_EXCLUDE_FROM_SHUFFLE = 12;
+	private static final int CTX_MENU_INCLUDE_IN_SHUFFLE = 13;
+	private static final int CTX_MENU_MARK_AUDIOBOOK = 14;
+	private static final int CTX_MENU_UNMARK_AUDIOBOOK = 15;
 
 	/**
 	 * Creates a context menu for an adapter row.
@@ -652,9 +692,10 @@ public class LibraryActivity
 			}
 			menu.addSubMenu(0, CTX_MENU_ADD_TO_PLAYLIST, 0, R.string.add_to_playlist).getItem().setIntent(rowData);
 			if(type == MediaUtils.TYPE_FILE) {
-				boolean isAudiobook = isAudiobook(rowData);
-				menu.add(0, isAudiobook ? CTX_MENU_CLEAR_AUDIOBOOK : CTX_MENU_MARK_AUDIOBOOK, 0,
-						isAudiobook ? R.string.clear_as_audiobook : R.string.mark_as_audiobook).setIntent(rowData);
+				boolean isNoShuffle = MediaLibrary.isNoShuffle(this, getSongIds(rowData));
+				MenuItem noShuffleMenuItem = menu.add(0, isNoShuffle ? CTX_MENU_INCLUDE_IN_SHUFFLE : CTX_MENU_EXCLUDE_FROM_SHUFFLE, 0,
+						isNoShuffle ? R.string.include_in_shuffle : R.string.exclude_from_shuffle).setIntent(rowData);
+				handleAudiobookContextMenuItem(menu, noShuffleMenuItem, rowData);
 			}
 			menu.add(0, CTX_MENU_DELETE, 0, R.string.delete).setIntent(rowData);
 		}
@@ -760,11 +801,17 @@ public class LibraryActivity
 			PlaylistDialog plDialog = PlaylistDialog.newInstance(this, intent, (id == LibraryAdapter.HEADER_ID ? (MediaAdapter)mCurrentAdapter : null));
 			plDialog.show(getFragmentManager(), "PlaylistDialog");
 			break;
-		case CTX_MENU_MARK_AUDIOBOOK:
-			handleMarkAudiobook(intent);
+		case CTX_MENU_EXCLUDE_FROM_SHUFFLE:
+			handleExcludeFromShuffle(intent);
 			break;
-		case CTX_MENU_CLEAR_AUDIOBOOK:
-			handleClearAudiobook(intent);
+		case CTX_MENU_INCLUDE_IN_SHUFFLE:
+			handleIncludeInShuffle(intent);
+			break;
+		case CTX_MENU_MARK_AUDIOBOOK:
+			handleMarkAsAudiobook(intent);
+			break;
+		case CTX_MENU_UNMARK_AUDIOBOOK:
+			handleUnmarkAsAudiobook(intent);
 			break;
 		default:
 			return super.onContextItemSelected(item);

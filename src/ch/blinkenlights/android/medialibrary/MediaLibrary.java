@@ -21,18 +21,18 @@ import android.content.Context;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.ContentObserver;
+import android.database.DatabaseUtils;
 import android.provider.MediaStore;
 import android.os.Environment;
 
 import java.util.ArrayList;
 import java.io.File;
 import java.util.List;
+import java.util.UUID;
 
+import ch.blinkenlights.android.vanilla.Audiobook;
 import ch.blinkenlights.android.vanilla.MediaUtils;
-
-import ch.blinkenlights.android.vanilla.MediaUtils;
-
-import ch.blinkenlights.android.vanilla.MediaUtils;
+import ch.blinkenlights.android.vanilla.Song;
 
 public class MediaLibrary  {
 
@@ -45,7 +45,9 @@ public class MediaLibrary  {
 	public static final String TABLE_PLAYLISTS                = "playlists";
 	public static final String TABLE_PLAYLISTS_SONGS          = "playlists_songs";
 	public static final String TABLE_PREFERENCES              = "preferences";
-	public static final String TABLE_NO_SHUFFLE               = "no_shuffle";
+	public static final String TABLE_NO_SHUFFLE               = "no_shuffle_songs";
+	public static final String TABLE_AUDIOBOOKS               = "audiobooks";
+	public static final String TABLE_AUDIOBOOKS_SONGS         = "audiobooks_songs";
 	public static final String VIEW_ARTISTS                   = "_artists";
 	public static final String VIEW_ALBUMARTISTS              = "_albumartists";
 	public static final String VIEW_COMPOSERS                 = "_composers";
@@ -414,25 +416,25 @@ public class MediaLibrary  {
 	}
 
 	public static void addToNoShuffle(Context context, List<Long> ids) {
-		if(null != ids && ids.size() > 0) {
+		if(null != ids && !ids.isEmpty()) {
 			ids.removeAll(MediaUtils.getNoShuffleSongIDs(context));
-			if (ids.size() > 0) {
+			if (!ids.isEmpty()) {
 				ArrayList<ContentValues> bulk = new ArrayList<>();
 				for (long id : ids) {
 					ContentValues v = new ContentValues();
 					v.put(MediaLibrary.PlaylistSongColumns.SONG_ID, id);
 					bulk.add(v);
 				}
-				getBackend(context).bulkInsert(MediaLibrary.TABLE_NO_SHUFFLE, null, bulk);
+				getBackend(context).bulkInsert(TABLE_NO_SHUFFLE, null, bulk);
 				MediaUtils.onMediaChange();
 			}
 		}
 	}
 
 	public static void removeFromNoShuffle(Context context, List<Long> ids) {
-		if(null != ids && ids.size() > 0) {
+		if(null != ids && !ids.isEmpty()) {
 			ids.retainAll(MediaUtils.getNoShuffleSongIDs(context));
-			if (ids.size() > 0) {
+			if (!ids.isEmpty()) {
 				StringBuffer sb = new StringBuffer();
 				sb.append("(");
 				for (int i = 0; i < ids.size(); i++) {
@@ -443,14 +445,13 @@ public class MediaLibrary  {
 				}
 				sb.append(")");
 				String whereClause = NoShuffleColumns.SONG_ID + " IN " + sb.toString();
-				getBackend(context).delete(MediaLibrary.TABLE_NO_SHUFFLE, whereClause, null);
+				getBackend(context).delete(TABLE_NO_SHUFFLE, whereClause, null);
 				MediaUtils.onMediaChange();
 			}
 		}
 	}
 
 	public static boolean isNoShuffle(Context context, List<Long> ids) {
-		boolean noShuffle = false;
 		StringBuilder sb = new StringBuilder();
 		sb.append("(");
 		for(int i=0; i < ids.size(); i++) {
@@ -460,16 +461,94 @@ public class MediaLibrary  {
 			}
 		}
 		sb.append(")");
-		try {
-			Cursor cursor = getBackend(context).query(true, MediaLibrary.TABLE_NO_SHUFFLE, new String[] {NoShuffleColumns.SONG_ID},
-                    NoShuffleColumns.SONG_ID + " IN " + sb.toString(), null,
-                    null, null, null, null);
-			noShuffle = cursor != null && cursor.getCount() > 0;
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return noShuffle;
+		Cursor cursor = getBackend(context).query(true, TABLE_NO_SHUFFLE, new String[] {NoShuffleColumns.SONG_ID},
+				NoShuffleColumns.SONG_ID + " IN " + sb.toString(), null,
+				null, null, null, null);
+		return cursor != null && cursor.getCount() > 0;
 	}
+
+	public static void addAudiobook(Context context, List<Long> songIDs, String file) {
+		if(null != songIDs && !songIDs.isEmpty()) {
+			ContentValues v = new ContentValues();
+			long audiobookID = hash63(UUID.randomUUID().toString());
+			v.put(MediaLibrary.AudiobookColumns._ID, audiobookID);
+			v.put(AudiobookColumns.PATH, new File(file).isDirectory() ? file : null);
+			long id = getBackend(context).insert(TABLE_AUDIOBOOKS, null, v);
+			ArrayList<ContentValues> bulk = new ArrayList<>();
+			for (Long songID : songIDs) {
+				v = new ContentValues();
+				v.put(AudiobookSongColumns.SONG_ID, songID);
+				v.put(AudiobookSongColumns.AUDIOBOOK_ID, audiobookID);
+				bulk.add(v);
+			}
+			getBackend(context).bulkInsert(TABLE_AUDIOBOOKS_SONGS, null, bulk);
+		}
+	}
+
+	public static void removeAudiobook(Context context, List<Long> songIDs) {
+		if(null != songIDs && !songIDs.isEmpty()) {
+			Cursor cursor = getBackend(context).query(true, TABLE_AUDIOBOOKS_SONGS, new String[]{AudiobookSongColumns.AUDIOBOOK_ID},
+					AudiobookSongColumns.SONG_ID + " = " + String.valueOf(songIDs.get(0)),
+					null, null, null, null, null);
+			if(null != cursor && cursor.getCount() > 0) {
+				cursor.moveToNext();
+				long audiobookID = cursor.getLong(0);
+				cursor.close();
+				getBackend(context).delete(TABLE_AUDIOBOOKS_SONGS,
+						AudiobookSongColumns.AUDIOBOOK_ID + " = " + String.valueOf(audiobookID), null);
+				getBackend(context).delete(TABLE_AUDIOBOOKS, AudiobookColumns._ID + " = " + String.valueOf(audiobookID), null);
+			}
+		}
+	}
+
+	public static long getAudiobookIDFromTrack(Context context, Song song) {
+		Cursor cursor = getBackend(context).query(true, TABLE_AUDIOBOOKS_SONGS, new String[]{AudiobookSongColumns.AUDIOBOOK_ID},
+				AudiobookSongColumns.SONG_ID + " = " + String.valueOf(Song.getId(song)),
+				null, null, null, null, null);
+		if(null != cursor && cursor.getCount() > 0) {
+			cursor.moveToNext();
+			long audiobookID = cursor.getLong(0);
+			cursor.close();
+			return audiobookID;
+		}
+		return -1;
+	}
+
+	public static boolean isPathInAudiobook(Context context, String path) {
+		String queryPath = MediaUtils.getFileQueryPath(path);
+		Cursor cursor = getBackend(context).query(true, TABLE_AUDIOBOOKS, new String[] {AudiobookColumns._ID},
+				"instr(" + DatabaseUtils.sqlEscapeString(queryPath) + "," + AudiobookColumns.PATH + ")", null, null, null, null, null);
+		return null != cursor && cursor.getCount() > 0;
+	}
+
+	public static boolean setBookmarkIdNecessary(Context context, Song song, int position) {
+		if(null != song) {
+			long audiobookID = getAudiobookIDFromTrack(context, song);
+			if (-1 != audiobookID) {
+				ContentValues vals = new ContentValues();
+				vals.put(AudiobookColumns.SONG_ID, Song.getId(song));
+				vals.put(AudiobookColumns.LOCATION, position);
+				getBackend(context).update(TABLE_AUDIOBOOKS, vals, AudiobookColumns._ID + " = " + audiobookID, null);
+				return true;
+			}
+			return false;
+		}
+		return false;
+	}
+
+	public static Audiobook getAudiobookEntry(Context context, String path) {
+		Audiobook audiobook = null;
+		Cursor cursor = getBackend(context).query(true, TABLE_AUDIOBOOKS,
+				new String[] {AudiobookColumns.SONG_ID, AudiobookColumns.LOCATION},
+				AudiobookColumns.PATH + " = " + DatabaseUtils.sqlEscapeString(path), null, null, null, null, null);
+		if(null != cursor && cursor.getCount() > 0) {
+			cursor.moveToNext();
+			audiobook = new Audiobook(path, cursor.getLong(0), cursor.getLong(1));
+			cursor.close();
+		}
+		return audiobook;
+	}
+
 
 	/**
 	 * Returns the number of songs in the music library
@@ -765,6 +844,38 @@ public class MediaLibrary  {
 	public interface NoShuffleColumns {
 		/**
 		 * The song this entry references
+		 */
+		String SONG_ID = "song_id";
+	}
+
+	// Audiobooks
+	public interface AudiobookColumns {
+		/**
+		 * The id of this reference
+		 */
+		String _ID = "audiobook_id";
+		/**
+		 * The root path of the audiobook
+		 */
+		String PATH = "path";
+		/**
+		 * The id of the last song played
+		 */
+		String SONG_ID = SongColumns._ID;
+		/**
+		 * The location of the last song played
+		 */
+		String LOCATION = "location";
+	}
+
+	// Audiobook <-> Song mapping
+	public interface AudiobookSongColumns {
+		/**
+		 * the audiobook id this maps to
+		 */
+		String AUDIOBOOK_ID = "_audiobook_id";
+		/**
+		 * the song this maps to
 		 */
 		String SONG_ID = "song_id";
 	}
