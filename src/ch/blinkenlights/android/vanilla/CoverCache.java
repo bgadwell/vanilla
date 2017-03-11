@@ -24,17 +24,19 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.graphics.Bitmap;
-import android.graphics.Bitmap.CompressFormat;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Environment;
 import android.util.Log;
 
-import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FilenameFilter;
 import java.io.InputStream;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Random;
 import java.util.regex.Pattern;
 
@@ -195,10 +197,10 @@ public class CoverCache {
 		 * SQLite table to use
 		 */
 		private final static String TABLE_NAME = "covercache";
-		/**
-		 * Priority-ordered list of possible cover names
-		 */
-		private final static Pattern[] COVER_MATCHES = { Pattern.compile("(?i).+/(COVER|ALBUM)\\.(JPE?G|PNG)$"), Pattern.compile("(?i).+/(CD|FRONT|ARTWORK)\\.(JPE?G|PNG)$"), Pattern.compile("(?i).+\\.(JPE?G|PNG)$") };
+
+		private final Pattern coverPattern = Pattern.compile("(?i).+/(FOLDER|COVER|ALBUM|CD|FRONT|ARTWORK)\\.(JPE?G|PNG)$");
+		private final Pattern imagePattern = Pattern.compile("(?i).+\\.(JPE?G|PNG)$");
+
 		/**
 		 * Projection of all columns in the database
 		 */
@@ -401,26 +403,32 @@ public class CoverCache {
 				if ((CoverCache.mCoverLoadMode & CoverCache.COVER_MODE_VANILLA) != 0) {
 					final File baseFile  = new File(song.path);  // File object of queried song
 					String bestMatchPath = null;                 // The best cover-path we found
-					int bestMatchIndex   = COVER_MATCHES.length; // The best cover-index/priority found
-					int loopCount        = 0;                    // Directory items loop counter
 
 					// Only start search if the base directory of this file is NOT the public
 					// downloads folder: Picking files from there would lead to a false positive
 					// in most cases
-					if (baseFile.getParentFile().equals(sDownloadsDir) == false) {
-						for (final File entry : baseFile.getParentFile().listFiles()) {
-							for (int i=0; i < bestMatchIndex ; i++) {
-								// We are checking each file entry to see if it matches a known
-								// cover pattern. We abort on first hit as the Pattern array is sorted from good->meh
-								if (COVER_MATCHES[i].matcher(entry.toString()).matches()) {
-									bestMatchIndex = i;
-									bestMatchPath = entry.toString();
-									break;
-								}
+					if (!baseFile.getParentFile().equals(sDownloadsDir)) {
+						//find all potential artwork in this folder
+						File[] artwork = baseFile.getParentFile().listFiles(new FilenameFilter() {
+							@Override
+							public boolean accept(File dir, String name) {
+								return coverPattern.matcher(name).matches() || imagePattern.matcher(name).matches();
 							}
-							// Stop loop if we found the best match or if we looped 150 times
-							if (loopCount++ > 150 || bestMatchIndex == 0)
-								break;
+						});
+						//sort by size
+						if(null != artwork && artwork.length > 0) {
+							Arrays.sort(artwork, new Comparator<File>() {
+								@Override
+								public int compare(File f1, File f2) {
+									long f1Size = f1.length();
+									long f2Size = f2.length();
+									if(f1Size < f2Size) return 1;
+									if(f1Size > f2Size) return -1;
+									return 0;
+								}
+							});
+							//pick the biggest size as an indication of quality
+							bestMatchPath = artwork[0].getAbsolutePath();
 						}
 					}
 
