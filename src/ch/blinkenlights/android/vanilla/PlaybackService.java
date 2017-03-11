@@ -2374,7 +2374,8 @@ public final class PlaybackService extends Service
 			if(null != song) {
 				mPendingSeekSong = song.id;
 				mPendingSeek = (int) ((Audiobook) query.modeData).getPosition();
-				setCurrentSong(((Audiobook)query.modeData).getTimelineIndex());
+				mTimeline.setCurrentQueuePosition(((Audiobook)query.modeData).getTimelineIndex());
+				setCurrentSong(0);
 			}
 			mAudiobook = true;
 		} else {

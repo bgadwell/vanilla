@@ -443,6 +443,7 @@ public class LibraryActivity
 		}
 		if(audiobookPath || null != audiobook) {
 			noShuffleMenuItem.setEnabled(false);
+			menu.setHeaderTitle(intent.getStringExtra(LibraryAdapter.DATA_TITLE) + " (" + getString(R.string.audiobook) + ")");
 		}
 
 	}
