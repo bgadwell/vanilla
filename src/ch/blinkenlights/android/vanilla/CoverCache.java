@@ -408,13 +408,11 @@ public class CoverCache {
 					// downloads folder: Picking files from there would lead to a false positive
 					// in most cases
 					if (!baseFile.getParentFile().equals(sDownloadsDir)) {
-						//find all potential artwork in this folder
-						File[] artwork = baseFile.getParentFile().listFiles(new FilenameFilter() {
-							@Override
-							public boolean accept(File dir, String name) {
-								return coverPattern.matcher(name).matches() || imagePattern.matcher(name).matches();
-							}
-						});
+						//find all potential cover artwork in this folder
+						File[] artwork = baseFile.getParentFile().listFiles(new RegExFilenameFilter(coverPattern));
+						if(null == artwork || artwork.length == 0) {
+							artwork = baseFile.getParentFile().listFiles(new RegExFilenameFilter(imagePattern));
+						}
 						//sort by size
 						if(null != artwork && artwork.length > 0) {
 							Arrays.sort(artwork, new Comparator<File>() {
@@ -503,6 +501,19 @@ public class CoverCache {
 				sampleSize = Math.round((int)Math.sqrt((float) hasPixels / (float) maxPxCount));
 			}
 			return sampleSize;
+		}
+
+		private class RegExFilenameFilter implements FilenameFilter {
+			private Pattern pattern;
+
+			public RegExFilenameFilter(Pattern pattern) {
+				this.pattern = pattern;
+			}
+
+			@Override
+			public boolean accept(File dir, String name) {
+				return pattern.matcher(name).matches();
+			}
 		}
 
 	}
